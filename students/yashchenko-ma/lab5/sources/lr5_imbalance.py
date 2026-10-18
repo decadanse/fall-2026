@@ -5,6 +5,7 @@
 """
 import warnings
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss,
                              log_loss, precision_recall_curve, precision_score,
@@ -13,7 +14,7 @@ from sklearn.metrics import (accuracy_score, average_precision_score, brier_scor
 from common import setup_style, save_fig, C1, C2, INK2
 from logreg import LogisticRegressionIRLS
 from lr5_compare import sklearn_reference
-from lr5_data import get_subsample_split, get_full_split, FEATURE_NAMES
+from lr5_data import get_subsample_split, get_full_split, FEATURE_NAMES, save_csv
 
 COEF_NAMES = ["intercept"] + FEATURE_NAMES
 
@@ -87,6 +88,22 @@ def main():
     ws, wf = ms.res_.w, mf.res_.w
     for nm, a, b in zip(COEF_NAMES, ws, wf):
         print(f"{nm:<14}{a:>12.4f}{b:>10.4f}{b - a:>16.4f}")
+
+    # --- CSV ---
+    en = {"доля +1 в test": "test_positive_rate", "средняя P(+1|x), test": "test_mean_probability",
+          "log-loss": "log_loss", "Brier": "brier", "ROC-AUC": "roc_auc", "PR-AUC (AP)": "pr_auc_ap",
+          "accuracy @0.5": "accuracy_at_0.5", "accuracy 'всегда -1'": "accuracy_always_minus1",
+          "precision @0.5": "precision_at_0.5", "recall @0.5": "recall_at_0.5",
+          "порог F1 (train)": "f1_threshold_train", "precision @F1-порог": "precision_at_f1_threshold",
+          "recall @F1-порог": "recall_at_f1_threshold", "F1 @F1-порог": "f1_at_f1_threshold"}
+    save_csv(pd.DataFrame({
+        "metric": [en[k] for k in keys],
+        "subsample_1_2": [rows["Подвыборка 1:2"][k] for k in keys],
+        "full": [rows["Полная выборка"][k] for k in keys]}), "lr5_metrics.csv")
+    ids = {"Подвыборка 1:2": "subsample_1_2", "Полная выборка": "full"}
+    save_csv(pd.concat([pd.DataFrame({"dataset": ids[n], "y_true": sets[n][3],
+                                      "p_newton": probs[n]}) for n in sets], ignore_index=True),
+             "lr5_test_predictions.csv")
 
     # --- график: ROC и PR ---
     cols = {"Подвыборка 1:2": C1, "Полная выборка": C2}

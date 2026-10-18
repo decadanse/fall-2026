@@ -1,5 +1,6 @@
 """Данные для ЛР5: сбалансированная подвыборка (get_data из data.py без изменений)
 и полная несбалансированная выборка (10000 строк, 3.4% отказов)."""
+import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -8,6 +9,16 @@ from sklearn.preprocessing import StandardScaler
 from data import get_data, load_raw, FEATURES, RANDOM_STATE
 
 FEATURE_NAMES = FEATURES + ["type_L", "type_M"]
+RESULTS_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results"))
+
+
+def save_csv(df, name):
+    """Сохранить таблицу в results/<name> (UTF-8, разделитель запятая, числа без округления)."""
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    path = os.path.join(RESULTS_DIR, name)
+    df.to_csv(path, index=False)
+    print(f"[csv] сохранено: {path}")
 
 
 def get_subsample_split():

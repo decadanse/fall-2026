@@ -4,6 +4,7 @@
 """
 import warnings
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
@@ -11,7 +12,7 @@ from sklearn.metrics import log_loss
 
 from common import setup_style, save_fig, C1, C2, C3, INK2
 from logreg import LogisticRegressionIRLS, add_intercept, grad_hess, loss
-from lr5_data import get_subsample_split, get_full_split, FEATURE_NAMES
+from lr5_data import get_subsample_split, get_full_split, FEATURE_NAMES, save_csv
 
 COEF_NAMES = ["intercept"] + FEATURE_NAMES
 
@@ -98,7 +99,38 @@ def run(name, split):
     for nm, a, b in zip(COEF_NAMES, w, w_sk):
         print(f"  {nm:<13}{a:>10.5f}{b:>10.5f}{abs(a - b):>11.2e}")
 
-    return dict(ms=ms, w_sk=w_sk, p_own=p_own, p_sk=p_sk, wdiff=np.abs(w - w_sk))
+    # --- таблицы для CSV ---
+    eq = {
+        "n_iter_newton": ms["newton"].res_.n_iter,
+        "n_iter_irls": ms["irls"].res_.n_iter,
+        "n_iter_irls_glm": ms["irls_glm"].res_.n_iter,
+        "n_iter_newton_zero_init": ms["newton_zeros"].res_.n_iter,
+        "loss_Q_at_optimum": r.loss_hist[-1],
+        "grad_norm_at_optimum": r.grad_hist[-1],
+        "max_dw_newton_vs_irls_all_iterations": d_ni.max(),
+        "max_dw_newton_vs_irls_glm_all_iterations": d_ng.max(),
+        "max_dw_init_ols_vs_zeros": np.abs(w - ms["newton_zeros"].res_.w).max(),
+        "max_dw_newton_vs_sklearn": np.abs(w - w_sk).max(),
+        "max_dw_irls_vs_sklearn": np.abs(ms["irls"].res_.w - w_sk).max(),
+        "max_dp_vs_sklearn_test": np.abs(p_own - p_sk).max(),
+        "abs_dlogloss_vs_sklearn_test": abs(log_loss(y01_te, p_own) - log_loss(y01_te, p_sk)),
+        "label_agreement_with_sklearn_test": float(np.mean(ms["newton"].predict(X_te) == sk.predict(X_te))),
+        "abs_Q_minus_neg_loglik": abs(loss(w, F, y_tr.astype(float)) - ce),
+        "hessian_min_eigenvalue": ev.min(),
+        "hessian_max_eigenvalue": ev.max(),
+    }
+    traj = pd.DataFrame([
+        dict(method=k, iteration=t, loss_Q=q, grad_norm=gn,
+             **{f"w_{nm}": v for nm, v in zip(COEF_NAMES, wt)})
+        for k, m in ms.items()
+        for t, (q, gn, wt) in enumerate(zip(m.res_.loss_hist, m.res_.grad_hist, m.res_.w_hist))])
+    weights = pd.DataFrame({
+        "feature": COEF_NAMES, "newton": w, "irls": ms["irls"].res_.w,
+        "irls_glm": ms["irls_glm"].res_.w, "sklearn": w_sk,
+        "abs_diff_newton_sklearn": np.abs(w - w_sk)})
+
+    return dict(ms=ms, w_sk=w_sk, p_own=p_own, p_sk=p_sk, wdiff=np.abs(w - w_sk),
+                eq=eq, traj=traj, weights=weights)
 
 
 def main():
@@ -107,6 +139,19 @@ def main():
         "Подвыборка 1:2": run("ПОДВЫБОРКА 1:2", get_subsample_split()),
         "Полная выборка": run("ПОЛНАЯ ВЫБОРКА", get_full_split()),
     }
+    # --- CSV ---
+    ids = {"Подвыборка 1:2": "subsample_1_2", "Полная выборка": "full"}
+
+    def stack(key):
+        df = pd.concat([r[key].assign(dataset=ids[n]) for n, r in res.items()], ignore_index=True)
+        return df[["dataset"] + [c for c in df.columns if c != "dataset"]]
+
+    save_csv(pd.DataFrame([dict(dataset=ids[n], quantity=k, value=v)
+                           for n, r in res.items() for k, v in r["eq"].items()]),
+             "lr5_equivalence.csv")
+    save_csv(stack("traj"), "lr5_trajectory.csv")
+    save_csv(stack("weights"), "lr5_weights.csv")
+
     cols = {"Подвыборка 1:2": C1, "Полная выборка": C2}
 
     # --- график 1: сходимость ---
