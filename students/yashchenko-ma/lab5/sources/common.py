@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler
 from data import load_raw, FEATURES, RANDOM_STATE
 
 TARGET = "torque"
-IMAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "image")
+IMAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "images")
 
 # Палитра: синий / оранжевый / аквамарин (светлая тема), поверхность #fcfcfb
 C1, C2, C3 = "#2a78d6", "#eb6834", "#1baf7a"
